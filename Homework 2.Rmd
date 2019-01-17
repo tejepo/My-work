@@ -1,0 +1,102 @@
+---
+title: "Assignment 2"
+author: "Terrence Pope"
+date: "4/9/2018"
+output: html_document
+---
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(gapminder)
+library(forcats)
+library(pander)
+```
+
+First let's look at the GDP per capita over time. We'll color the different countries to differentiate:
+```{r}
+gapminder %>%
+  mutate(country=fct_reorder(country, gdpPercap, last)) %>%
+  ggplot(aes(year, gdpPercap, color=continent, group=country)) +
+  geom_line() + scale_y_log10() +
+  xlab("Year") +
+  ylab("Per Capita GDP")
+```
+
+To ask a different question and look at data in a different way let's look at the life expectancy over time by continent:
+
+```{r}
+gapminder %>%
+  filter(continent %in% c("Africa", "Asia", "Europe", "Americas", "Oceania")) %>%
+  ggplot(aes(year, lifeExp, group=continent, color=continent)) +
+  geom_point() +
+  xlab("Year") +
+  ylab("Life Expectancy") +
+  scale_color_manual("Continent", values=c("Africa"="green",
+                                         "Asia"="red",
+                                         "Europe"="black",
+                                         "Americas" = "blue",
+                                         "Oceania" = "yellow"))
+```
+
+Well, this data is a little hard to parse no matter how we look at it. How about we take the data and break it down into several separate graphs looking back at our first comparison:
+```{r}
+ggplot(data = gapminder, aes(x = year, y = lifeExp, group = country)) +
+  geom_line(alpha = 0.5, aes(color = "Country", size = "Country")) +
+  geom_line(stat = "smooth", method = "loess", 
+            aes(group = continent, color = "Continent", 
+                size = "Continent"), alpha = 0.5) + 
+  xlab("Year") +
+  ylab("Life Expectancy") +
+  facet_wrap(~ continent, nrow = 2) +
+  scale_color_manual(name = "Unit", values = c("Country" = "black",
+                                               "Continent" = "blue")) +             scale_size_manual(name = "Unit", values = c("Country" = 0.5, 
+                                              "Continent" = 3)) + 
+  theme_minimal(base_size = 14) +
+  theme(legend.position=c(0.75, 0.2), 
+        axis.text.x = element_text(angle = 45))
+```
+  
+
+Cool! So we have something a little different (Particularly that the Life Expectancy has much more variability on some continents compared to others). Now let's do one more big picture examination of the data. First we'll go back to the  question of GDP per capita. We can see that GDP on the continents of Africa and Europe seem to fluctuate at different points on the timeline. Let's pull them apart and look closer at what ways they change over time.
+```{r}
+Africa <- gapminder %>% 
+  filter(continent=="Africa") %>%
+  group_by(country) %>%
+  mutate(gdp_change=(gdpPercap - lag(gdpPercap)),
+         lifeExp_change=(lifeExp - lag(lifeExp)))
+
+
+Europe <- gapminder %>% 
+  filter(continent=="Europe") %>%
+  group_by(country) %>%
+  mutate(gdp_change=(gdpPercap - lag(gdpPercap)),
+         lifeExp_change=(lifeExp - lag(lifeExp)))
+```
+
+Importantly, we're not going to focus too too much on the individual countries involved but rather, we'll take a birds eye view and look at these countries plotted together for broad patterns. First, we'll look at Europe:
+```{r}
+ggplot() +
+  geom_area(data=Europe,
+             aes(x=year, y=gdp_change, group=country, color=country)) +
+  xlab("Year") +
+  ylab("GDP Change") +
+  theme()
+```
+
+Seems to be the case that after 1990 there's some crisis that affects the GDP across several European countries. Let's look a little deeper at the countries in Africa:
+```{r}
+ggplot() +
+  geom_line(data=Africa, 
+            aes(x=year, y=gdp_change, group=country, color=country)) +
+  xlab("Year") +
+  ylab("GDP Change") +
+  theme()
+```
+
+There's a lot of stability here but we can see that for a couple of the countries, the GDP wildly fluctuates. Perhaps this is related to life expectancy. For a lark let's look at a quick correlation:
+
+```{r}
+cor(gapminder$lifeExp, gapminder$gdpPercap)
+```
+
+So what we see is that generally speaking, across the data set there is a `r round(cor(gapminder$lifeExp, gapminder$gdpPercap), 2)*100`% correlation between Life Expectancy and Per Capita GDP, which is pretty meaningful.

@@ -1,0 +1,226 @@
+---
+title: 'Assignment #3'
+author: "Terrence Pope"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    theme: spacelab
+    highlight: zenburn
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T)
+library(nycflights13)
+library(magrittr)
+library(pander)
+library(plyr)
+library(ggplot2)
+library(dplyr)
+data(flights)
+data(airlines)
+data(airports)
+data(planes)
+data(weather)
+```
+
+##A Question
+My big question in this in investigation has to do with measuring the efficiency of planes traveling to Seattle. This investigation relies primarily on 2013 data taken from the `nycflights` dataset. The way I've chosen to ask this question is by calculating the average *miles per minute* (mpm) and comparing this rate across a number of different pieces of plane data. 
+
+###Flights to Seattle
+To begin, I want to first separate out those planes that have come into SEATAC.
+
+<center> <h4>Table 1: Incoming Flights</h4> </center>
+```{r SEA}
+flights %>%
+  filter(dest == "SEA") %>%
+  select(origin, dest, tailnum, air_time, distance) %>% 
+  rename(`Flight Origin` = origin, `Flight Destination` = dest, `Plane ID` = tailnum, `Flight Time (min)` = air_time, `Distance (miles)`= distance) %>%
+  distinct(tailnum, .keep_all=T) %>%
+  head(10) %>%
+  pander(style = "rmarkdown")
+```
+
+In order to get at our question, we'll have to calculate our **mpm** statistic. We'll take this by dividing the distance by the flight time:
+
+<center> <h4>Table 2: Miles Per Minute</h4> </center>
+```{r MPM}
+flights %>%
+  filter(dest == "SEA") %>%
+  mutate(MPM = distance/air_time) %>%
+  select(origin, dest, tailnum, MPM) %>%
+  rename(`Flight Origin` = origin, `Flight Destination` = dest, `Plane ID` = tailnum) %>%
+  distinct(tailnum, .keep_all=T) %>%
+  head(10) %>%
+  pander(style = "rmarkdown")
+```
+
+###Summary of Flight Data X Plane
+So now that we have a sense of miles per minute, let's look at the average **mpm** for every plane that's come into SEATAC:
+
+<center> <h4>Table 3: Average MPM</h4> </center>
+```{r Summary}
+flights %>%
+  filter(dest == "SEA") %>% group_by(tailnum) %>%
+  rename(`Flight ID` = tailnum) %>%
+  mutate(MPM = distance/air_time) %>%
+  summarize(`# of Flights` = n(),
+          `Average MPM` = mean(MPM)) %>%
+  head(10) %>%
+  pander(style = "rmarkdown")
+```
+
+Since this isn't real data, let's *fudge* the numbers a little bit. I want to specifically pull out planes that have made at least 2 trips to Seattle. This will skew our data a little but for the sake of having averages that have at least 2 data points we'll filter out those that have only come once.
+
+<center> <h4>Table 4: Summary w/Flights > 1</h4> </center>
+```{r Summary2}
+flights %>%
+  filter(dest == "SEA") %>% group_by(tailnum) %>%
+  rename(`Flight ID` = tailnum) %>%
+  mutate(MPM = distance/air_time) %>%
+  summarize(`# of Flights` = n(),
+          `Average MPM` = mean(MPM)) %>%
+  filter(`# of Flights` >= 2) %>%
+  head(10) %>%
+  pander(style = "rmarkdown")
+```
+
+###Bar Graphs of Flight Data
+Now that we've narrowed down our data set to the data we're interest let's make a few bar graphs that show us a visual representation of the milles per minute of each plane. Since the data set is so large, we'll do this from a subset of our full data set with an n of 200.
+
+<center> <h4>Table 5: Sample Data</h4> </center>
+```{r sample}
+set.seed(11)
+flights.200 <- flights %>%
+  filter(dest == "SEA") %>%
+  sample_n(size = 200, replace = F)
+
+flights.200 %>%
+  add_count(tailnum) %>% filter(n >=2) %>%
+  arrange(tailnum) %>%
+  mutate(MPM = distance/air_time) %>%
+  select(Carrier = carrier, origin, dest, tailnum, MPM) %>%
+  rename(`Flight Origin` = origin, `Flight Destination` = dest, `Plane ID` = tailnum) %>%
+  distinct(`Plane ID`, .keep_all=T) %>%
+  head(15) %>%
+  pander(style = "rmarkdown")
+```
+
+Ok. here we go:
+
+<center> <h4>Graph 1: Avg MPM X Plane</h4> </center>
+```{r Bar1, eval= F}
+flights.200 %>%
+  add_count(tailnum) %>%
+  arrange(tailnum) %>%
+  mutate(MPM = distance/air_time) %>%
+  filter(n >=2) %>%
+  ggplot(aes(fill=carrier, y=MPM, x=tailnum)) + #grouped
+    geom_bar(position="dodge", stat="identity") +
+    xlab('Plane ID') +
+    labs(fill='Carrier') +
+    ggtitle("MPM X Plane") +
+    theme(axis.text.x=element_text(angle=45,hjust= 1,vjust=1))
+```
+<center>
+```{r Bar1hidden, echo= F}
+flights.200 %>%
+  add_count(tailnum) %>%
+  arrange(tailnum) %>%
+  mutate(MPM = distance/air_time) %>%
+  filter(n >=2) %>%
+  ggplot(aes(fill=carrier, y=MPM, x=tailnum)) + #grouped
+    geom_bar(position="dodge", stat="identity") +
+    xlab('Plane ID') +
+    labs(fill='Carrier') +
+    ggtitle("MPM X Plane") +
+    theme(axis.text.x=element_text(angle=45,hjust= 1,vjust=1))
+```
+</center>
+
+<br></br>
+Since we're seeing that some airlines are represented more than others let's just look at this same breakdown of MPM grouped by airline rather than by the individual plane.
+
+<center> <h4>Graph 2: Avg MPM X Carrier</h4> </center>
+```{r Bar2, eval=F}
+flights.200 %>%
+  group_by(tailnum) %>% add_count(tailnum) %>%
+  mutate(MPM = distance/air_time) %>%
+  filter(n >=2) %>%
+  ggplot(aes(fill=carrier, y=MPM, x=carrier)) + #grouped
+    geom_bar(position="dodge", stat="identity") +
+    xlab('Carrier') +
+    ggtitle("MPM X Carrier") +
+    theme(axis.text.x=element_text(angle=45,hjust= 1,vjust=1)) +
+    theme(legend.position="none")
+```
+<center>
+```{r Bar2hidden, echo=F}
+flights.200 %>%
+  group_by(tailnum) %>% add_count(tailnum) %>%
+  mutate(MPM = distance/air_time) %>%
+  filter(n >=2) %>%
+  ggplot(aes(fill=carrier, y=MPM, x=carrier)) + #grouped
+    geom_bar(position="dodge", stat="identity") +
+    xlab('Carrier') +
+    ggtitle("MPM X Carrier") +
+    theme(axis.text.x=element_text(angle=45,hjust= 1,vjust=1)) +
+    theme(legend.position="none")
+```
+</center>
+
+##Analysis
+
+###Are some planes faster than others?
+Well, just looking at the graphs will only tell us but so much so let's do some analysis. Our intuition here is that there are no significant differences between the planes or the airlines on their average speed at getting from where they're coming from to Seattle. Let's run an ANOVA on the subset of our data to confirm this:
+
+<center> <h4>Analysis 1: Two Way Factorial ANOVA</h4> </center>
+```{r preliminaryanalysis}
+lm1 <- flights.200 %>%
+  rename(Carrier = carrier) %>%
+  group_by(Plane_ID = tailnum) %>%
+  mutate(MPM = distance/air_time) %>%
+  aov(MPM ~ Carrier + Plane_ID, .) 
+
+lm1 %>% summary() %>%
+  pander(style = "rmarkdown")
+```
+
+What we see here confirms what we've seen in the graphs, which is basically that there are no differences in either airlines or the planes in their speed. This is good news! No matter where you're flying from you'll get there at ostensibly the same speed. 
+
+##One more thing
+Let's do one or two final things. The first is to ask one final question. While there don't seem to be differences between individual planes or carriers, lets look at manufacturers and models to see if any one of them makes a faster plane. First we'll merge the planes dataset with our flight data:
+
+<center> <h4>Table 5: Plane Info & MPM </h4> </center>
+```{r join}
+flightsplus <- flights.200 %>%
+  left_join(planes %>% select(tailnum, manufacturer, model), by = "tailnum") %>%
+  group_by(tailnum) %>% add_count(tailnum) %>%
+  mutate(MPM = distance/air_time)
+
+flightsplus %>%
+  select(tailnum, manufacturer, model, n, MPM) %>%
+  head(10) %>%
+  pander(style = "rmarkdown")
+```
+
+Then we'll run a new ANOVA to see if the speed differs based on these new factors...
+
+<center> <h4>>Analysis 2: Two Way Factorial ANOVA </h4> </center>
+```{r posthocanalysis}
+lm2 <- flightsplus %>%
+  group_by(Plane_ID = tailnum) %>%
+  mutate(MPM = distance/air_time) %>%
+  aov(MPM ~ carrier + manufacturer + model + Plane_ID, .) 
+
+lm2 %>% summary() %>%
+  pander(style = "rmarkdown")
+```
+
+Voila!
+
+##Conclusion
+
+So in summary what we've found is that no matter where you're coming from, no matter which of the 12 models of plane you're flying in, from any of the 3 major manufacturers, and that no matter which of the 4 carriers you use you will get from your destination to Seattle at approximately the same rate.

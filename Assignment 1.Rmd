@@ -1,0 +1,106 @@
+---
+title: "Assignment 1"
+author: "Terrence Pope"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    theme: spacelab
+    highlight: zenburn
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+data(swiss) #pretty sure this is always loaded.
+library(tidyverse)
+library(pander)
+### Note about comments ###
+# If you want to comment using the R syntax for commenting you need to do it in a chunk and use a hashtag. Anything written outside of a chunk will be shown as text.
+###########################
+```
+
+## Introduction 
+
+This assignment is the product of the labor of one **Terrence Pope**. The purpose of this is to do some exploratory analysis of the `swiss` data set that comes built into one of the packages installed in R.
+
+##Swiss data set
+To being let's look at quick summary of the data contained in swiss:
+```{r explore_swiss, echo=F}
+pander(summary(swiss), style="rmarkdown", splot.tables=200)
+```
+
+Notice that while this data will be useful later, it doesn't tell us a lot right now. However, in addition to seeing the summary statistics of each of the variables, we now know the *names* of each variable as well. 
+
+One way to get approach exploration is to look at a set of plots showing us the relationships of all variables with one another. We'll do that by running the  `pairs()` function on the *swiss* data set. Let's try it now:
+
+***
+<center> <h4>Plot 1: Swiss</h4>
+```{r chunk_1, echo=F}
+pairs(swiss, main="Pairwise Scatterplots of Swiss Data")
+test_obj <- "`r mean(swiss[,1])`"
+```
+</center>
+***
+
+##Exploring the Data
+
+By looking at the graphs, we can sort of see that the Fertility column seems to have strong relationships with several of the other variables. So let's take a moment to explore this particular variable. First, lets just look at the average fertility percentiles across all regions.
+
+We can do an in-line R calculation of the mean of percentiles in the first column of the swiss data set (`swiss[,1]` aka "Fertitlity") using the `mean()` function in R.
+
+The R code to run this in-line looks like this: `r test_obj`. Note that this code must be enclosed by the *backtick* symbol to display properly.
+
+Let's try it!  
+
+<center> <h4>Example code 1</h4> </center>
+```{r Mean_Fertility, echo=T}
+mean(swiss[,1])
+```
+
+Another way to call it would be to ask for `mean(swiss$Fertility)`. So the mean fertility percentile across regions is: `r round(mean(swiss$Fertility), 2)`. Note that this is the same as in our `summary()` above.
+
+We could also find the standard deviation of Fertility (`r round(sd(swiss$Fertility), 2)`), if we wanted to see a measure of the variance in this particular measure.
+
+##Looking Deeper into Fertility
+Finally let's look at some of the relationships that are at play in our data set. First we'll zoom it at the relationship between Fertility and one other variable. Let's look at the regression of **Infant Mortality** on **Fertility**. To see if rates of fertility predicts infant mortality across these regions.
+
+***
+<center> <h4>Plot 2: Regression</h4> 
+```{r fertility_infantmortality, echo=F}
+plot(Infant.Mortality ~ Fertility, 
+     data= swiss,
+     xlab = "Fertility",
+     ylab = "Rate of Infant Mortality",
+     col = "blue",
+     main = "Regression plot (Infant Mortality x Fertility)"
+)
+```
+</center>
+***
+
+##Analysis
+At a glance, it looks like there is definitely a noticeably positive relationship there. First let's look at our *correlation coefficient*. We arrive at a Pearson's *r* of `r round(cor(swiss$Fertility, swiss$Infant.Mortality), 3)`.
+
+Which is pretty good! We'd normally report a correlation of `r round((cor(swiss$Fertility, swiss$Infant.Mortality)*100), 2)`% as a moderate-to-strong relationship.
+
+When we run a regression analysis we find that the relationship is significant. We'll use the following code to look at this regression:
+
+<center> <h4>Example code 2</h4> </center>
+```{r Regression, echo=T}
+lm1 <- lm(swiss$Infant.Mortality ~ swiss$Fertility)
+pander(summary(lm1))
+```
+
+##Results
+Would you look at that! The relationship is significant. 
+
+```{r report, echo=F}
+regressionsummary <- summary(lm1)
+swissfertilitysummary <- regressionsummary$coefficients[2,]
+```
+
+What we see is that for every one point increase in Fertility there is a `r round(getElement(swissfertilitysummary, "Estimate"), 3)` point increase in the infant mortality rate. Further, this increase is significant with a *p* value of `r round(getElement(swissfertilitysummary, "Pr(>|t|)"), 3)`.
+
+And now you know. And knowing is half the battle!
